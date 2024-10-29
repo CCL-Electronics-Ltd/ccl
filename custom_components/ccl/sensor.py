@@ -1,4 +1,5 @@
 """Platform for sensor integration."""
+
 from __future__ import annotations
 
 import dataclasses
@@ -11,16 +12,16 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
     CONCENTRATION_PARTS_PER_BILLION,
     CONCENTRATION_PARTS_PER_MILLION,
     DEGREE,
-    EntityCategory,
     PERCENTAGE,
     UnitOfElectricPotential,
-    UnitOfLength,
     UnitOfIrradiance,
+    UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
     UnitOfSpeed,
@@ -28,7 +29,6 @@ from homeassistant.const import (
     UnitOfTime,
     UnitOfVolumetricFlux,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -169,6 +169,7 @@ CCL_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
     ),
 }
 
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -180,22 +181,22 @@ async def async_setup_entry(
     def _new_sensor(sensor: CCLSensor) -> None:
         """Add a sensor to the data entry."""
         entity_description = dataclasses.replace(
-                CCL_SENSOR_DESCRIPTIONS[sensor.sensor_type],
-                key=sensor.key,
-                name=sensor.name,
-            )
+            CCL_SENSOR_DESCRIPTIONS[sensor.sensor_type],
+            key=sensor.key,
+            name=sensor.name,
+        )
         async_add_entities([CCLSensorEntity(sensor, device, entity_description)])
 
     device.register_new_sensor_cb(_new_sensor)
     entry.async_on_unload(lambda: device.remove_new_sensor_cb(_new_sensor))
 
-    for key, sensor in device.sensors.items():
+    for sensor in device.sensors.values():
         _new_sensor(sensor)
 
 
 class CCLSensorEntity(CCLEntity, SensorEntity):
     """Representation of a Sensor."""
-    
+
     def __init__(
         self,
         internal: CCLSensor,
@@ -204,7 +205,7 @@ class CCLSensorEntity(CCLEntity, SensorEntity):
     ) -> None:
         """Initialize a CCL Sensor Entity."""
         super().__init__(internal, device)
-        
+
         self.entity_description = entity_description
 
     @property
