@@ -1,40 +1,39 @@
 """Platform for sensor integration."""
 
-from __future__ import annotations
-
 import dataclasses
+from typing import Any, override
 
-from aioccl import CCLDevice, CCLSensor, CCLSensorTypes
-
+from aioccl import CCLSensor, CCLSensorTypes
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-    CONCENTRATION_PARTS_PER_BILLION,
-    CONCENTRATION_PARTS_PER_MILLION,
     DEGREE,
     PERCENTAGE,
+    UnitOfDensity,
     UnitOfElectricPotential,
     UnitOfIrradiance,
     UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
+    UnitOfRatio,
     UnitOfSpeed,
     UnitOfTemperature,
     UnitOfTime,
     UnitOfVolumetricFlux,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .coordinator import CCLConfigEntry, CCLCoordinator
 from .entity import CCLEntity
 
-CCL_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
+PARALLEL_UPDATES = 0
+
+CCL_SENSOR_DESCRIPTIONS: dict[CCLSensorTypes, SensorEntityDescription] = {
     CCLSensorTypes.PRESSURE: SensorEntityDescription(
         key="PRESSURE",
         device_class=SensorDeviceClass.PRESSURE,
@@ -53,11 +52,11 @@ CCL_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
     ),
-    CCLSensorTypes.WIND_DIRECITON: SensorEntityDescription(
+    CCLSensorTypes.WIND_DIRECTION: SensorEntityDescription(
         key="WIND_DIRECTION",
-        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.WIND_DIRECTION,
+        state_class=SensorStateClass.MEASUREMENT_ANGLE,
         native_unit_of_measurement=DEGREE,
-        translation_key="wind_direction",
     ),
     CCLSensorTypes.WIND_SPEED: SensorEntityDescription(
         key="WIND_SPEED",
@@ -90,56 +89,56 @@ CCL_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
     ),
     CCLSensorTypes.CH_SENSOR_TYPE: SensorEntityDescription(
         key="CH_SENSOR_TYPE",
+        device_class=SensorDeviceClass.ENUM,
+        options=["thermo-hygro", "pool", "soil"],
         translation_key="ch_sensor_type",
     ),
     CCLSensorTypes.CO: SensorEntityDescription(
         key="CO",
         device_class=SensorDeviceClass.CO,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
+        native_unit_of_measurement=UnitOfRatio.PARTS_PER_MILLION,
     ),
     CCLSensorTypes.CO2: SensorEntityDescription(
         key="CO2",
         device_class=SensorDeviceClass.CO2,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=CONCENTRATION_PARTS_PER_MILLION,
+        native_unit_of_measurement=UnitOfRatio.PARTS_PER_MILLION,
     ),
     CCLSensorTypes.VOLATILE: SensorEntityDescription(
         key="VOLATILE",
         device_class=SensorDeviceClass.VOLATILE_ORGANIC_COMPOUNDS_PARTS,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=CONCENTRATION_PARTS_PER_BILLION,
+        native_unit_of_measurement=UnitOfRatio.PARTS_PER_BILLION,
     ),
-    CCLSensorTypes.VOC: SensorEntityDescription(
-        key="VOC",
-        translation_key="voc",
+    CCLSensorTypes.VOC_LEVEL: SensorEntityDescription(
+        key="VOC_LEVEL",
+        translation_key="voc_level",
     ),
     CCLSensorTypes.PM10: SensorEntityDescription(
         key="PM10",
         device_class=SensorDeviceClass.PM10,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        translation_key="pm10",
+        native_unit_of_measurement=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
     ),
     CCLSensorTypes.PM25: SensorEntityDescription(
         key="PM25",
         device_class=SensorDeviceClass.PM25,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        translation_key="pm25",
+        native_unit_of_measurement=UnitOfDensity.MICROGRAMS_PER_CUBIC_METER,
     ),
     CCLSensorTypes.AQI: SensorEntityDescription(
         key="AQI",
+        device_class=SensorDeviceClass.AQI,
         state_class=SensorStateClass.MEASUREMENT,
         translation_key="aqi",
     ),
     CCLSensorTypes.BATTERY: SensorEntityDescription(
         key="BATTERY",
+        device_class=SensorDeviceClass.BATTERY,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
         translation_key="battery",
-    ),
-    CCLSensorTypes.LEAKAGE: SensorEntityDescription(
-        key="LEAKAGE",
-        translation_key="leakage",
     ),
     CCLSensorTypes.LIGHTNING_DISTANCE: SensorEntityDescription(
         key="LIGHTNING_DISTANCE",
@@ -171,26 +170,44 @@ CCL_SENSOR_DESCRIPTIONS: dict[str, SensorEntityDescription] = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    entry: CCLConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Add sensors for passed config entry in HA."""
-    device: CCLDevice = entry.runtime_data
+    coordinator = entry.runtime_data
 
-    def _new_sensor(sensor: CCLSensor) -> None:
-        """Add a sensor to the data entry."""
-        entity_description = dataclasses.replace(
-            CCL_SENSOR_DESCRIPTIONS[sensor.sensor_type],
-            key=sensor.key,
-            name=sensor.name,
-        )
-        async_add_entities([CCLSensorEntity(sensor, device, entity_description)])
+    def _new_sensors(sensors: dict[str, CCLSensor]) -> bool:
+        """Add sensors to the data entry."""
+        sensor_entities = []
 
-    device.register_new_sensor_cb(_new_sensor)
-    entry.async_on_unload(lambda: device.remove_new_sensor_cb(_new_sensor))
+        for sensor in sensors.values():
+            if sensor.sensor_type in CCL_SENSOR_DESCRIPTIONS:
+                description = CCL_SENSOR_DESCRIPTIONS[sensor.sensor_type]
+                replace_args: dict[str, Any] = {
+                    "key": sensor.key,
+                }
+                if description.translation_key is None:
+                    replace_args["name"] = sensor.name
+                entity_description = dataclasses.replace(
+                    description,
+                    **replace_args,
+                )
+                sensor_entities.append(
+                    CCLSensorEntity(
+                        coordinator,
+                        entity_description,
+                        sensor,
+                    )
+                )
 
-    for sensor in device.sensors.values():
-        _new_sensor(sensor)
+        async_add_entities(sensor_entities)
+
+        return True
+
+    coordinator.device.set_new_sensor_callback(_new_sensors)
+
+    if coordinator.data is not None:
+        _new_sensors(coordinator.data)
 
 
 class CCLSensorEntity(CCLEntity, SensorEntity):
@@ -198,16 +215,17 @@ class CCLSensorEntity(CCLEntity, SensorEntity):
 
     def __init__(
         self,
-        internal: CCLSensor,
-        device: CCLDevice,
+        coordinator: CCLCoordinator,
         entity_description: SensorEntityDescription,
+        internal: CCLSensor,
     ) -> None:
         """Initialize a CCL Sensor Entity."""
-        super().__init__(internal, device)
+        super().__init__(internal, coordinator)
 
         self.entity_description = entity_description
 
+    @override
     @property
-    def native_value(self) -> None | str | int | float:
+    def native_value(self) -> int | float | str | None:
         """Return the state of the sensor."""
-        return self.internal.value
+        return self._internal.value

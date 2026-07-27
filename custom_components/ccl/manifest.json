@@ -3,11 +3,11 @@
   "name": "CCL Electronics",
   "codeowners": ["@fkiscd"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["http", "webhook"],
   "documentation": "https://www.home-assistant.io/integrations/ccl",
   "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/CCL-Electronics-Ltd/ccl/issues",
-  "requirements": ["aioccl==2024.12.12"],
-  "version": "2024.12"
+  "loggers": ["aioccl"],
+  "requirements": ["aioccl==2026.7"]
 }
