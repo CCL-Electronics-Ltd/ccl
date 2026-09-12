@@ -176,11 +176,11 @@ async def async_setup_entry(
     """Add sensors for passed config entry in HA."""
     coordinator = entry.runtime_data
 
-    def _new_sensors(sensors: dict[str, CCLSensor]) -> bool:
+    def _new_sensors(sensors: list[CCLSensor]) -> bool:
         """Add sensors to the data entry."""
         sensor_entities = []
 
-        for sensor in sensors.values():
+        for sensor in sensors:
             if sensor.sensor_type in CCL_SENSOR_DESCRIPTIONS:
                 description = CCL_SENSOR_DESCRIPTIONS[sensor.sensor_type]
                 replace_args: dict[str, Any] = {

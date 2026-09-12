@@ -40,12 +40,13 @@ class CCLCoordinator(DataUpdateCoordinator[dict[str, CCLSensor]]):
         )
 
         self.device = device
+        _LOGGER.debug("%s", self.device.passkey)
 
     @override
     async def _async_update_data(self) -> dict[str, CCLSensor]:
         _LOGGER.debug(
             "Checking for device(%s) availability at %s",
-            self.device.device_id,
+            self.device.passkey,
             time.monotonic(),
         )
 
