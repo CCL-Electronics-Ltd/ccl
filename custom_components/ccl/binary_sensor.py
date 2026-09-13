@@ -11,8 +11,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.config_entries import AddConfigEntryEntitiesCallback
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import CCLConfigEntry, CCLCoordinator
 from .entity import CCLEntity

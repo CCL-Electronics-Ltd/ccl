@@ -10,6 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.config_entries import AddConfigEntryEntitiesCallback
 from homeassistant.const import (
     DEGREE,
     PERCENTAGE,
@@ -26,7 +27,6 @@ from homeassistant.const import (
     UnitOfVolumetricFlux,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import CCLConfigEntry, CCLCoordinator
 from .entity import CCLEntity
